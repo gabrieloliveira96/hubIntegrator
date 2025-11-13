@@ -2,6 +2,27 @@
 
 Monorepo de referência para um Hub de Integração e Orquestração construído com .NET 8, focado em robustez, rastreabilidade e escalabilidade.
 
+## 📚 Documentação Técnica Completa
+
+**Para a documentação técnica completa da arquitetura, consulte:**
+
+👉 **[Proposta de Arquitetura TOTVS - Hub de Integração](./docs/Proposta_Arquitetura_TOTVS_HubIntegracao.md)**
+
+A documentação inclui:
+- Visão geral da arquitetura com diagramas
+- Decisões de arquitetura e justificativas técnicas
+- Fluxo completo de dados e processos
+- Estratégias de resiliência e observabilidade
+- Segurança e governança
+- Deploy e escalabilidade
+- Matriz de requisitos não funcionais
+
+**Para gerar o PDF:**
+```powershell
+.\docs\generate-pdf.ps1
+```
+Ou consulte [docs/GERAR-PDF.md](./docs/GERAR-PDF.md) para outras opções.
+
 ## Arquitetura
 
 ```
