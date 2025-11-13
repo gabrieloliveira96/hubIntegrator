@@ -1,0 +1,265 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hub-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hub-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: hub-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hub-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: hub-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - hub-network
+
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: hub-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "8888:8888"   # Prometheus metrics
+    depends_on:
+      - jaeger
+      - prometheus
+    networks:
+      - hub-network
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: hub-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"  # UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+    networks:
+      - hub-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: hub-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - hub-network
+
+  seq:
+    image: datalust/seq:latest
+    container_name: hub-seq
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_ADMINPASSWORD: "Admin@123"  # Senha padrão para desenvolvimento
+    ports:
+      - "5341:80"   # HTTP UI
+      - "5342:5341" # Ingestion API
+    volumes:
+      - seq_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/api"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hub-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: hub-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - hub-network
+
+  loki:
+    image: grafana/loki:latest
+    container_name: hub-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - hub-network
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: hub-promtail
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/config.yml
+      - /var/log:/var/log:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - hub-network
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: Dockerfile.gateway
+    container_name: hub-gateway
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - Jwt__Authority=https://localhost:5001
+      - Jwt__Audience=hub-api
+      - OpenTelemetry__OtlpEndpoint=http://otel-collector:4317
+      - ReverseProxy__Clusters__inbound-cluster__Destinations__destination1__Address=http://inbound-api:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    networks:
+      - hub-network
+    restart: unless-stopped
+
+  inbound-api:
+    build:
+      context: ..
+      dockerfile: Dockerfile.inbound
+    container_name: hub-inbound-api
+    ports:
+      - "5001:8080"
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__PostgreSQL=Host=postgres;Port=5432;Database=inbound_db;Username=postgres;Password=postgres
+      - ConnectionStrings__Redis=redis:6379
+      - ConnectionStrings__RabbitMQ=amqp://guest:guest@rabbitmq:5672/
+      - Jwt__Authority=https://localhost:5001
+      - Jwt__Audience=hub-api
+      - OpenTelemetry__OtlpEndpoint=http://otel-collector:4317
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    networks:
+      - hub-network
+    restart: unless-stopped
+
+  orchestrator-worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile.orchestrator
+    container_name: hub-orchestrator-worker
+    environment:
+      - ConnectionStrings__PostgreSQL=Host=postgres;Port=5432;Database=orchestrator_db;Username=postgres;Password=postgres
+      - ConnectionStrings__RabbitMQ=amqp://guest:guest@rabbitmq:5672/
+      - OpenTelemetry__OtlpEndpoint=http://otel-collector:4317
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    networks:
+      - hub-network
+    restart: unless-stopped
+
+  outbound-worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile.outbound
+    container_name: hub-outbound-worker
+    environment:
+      - ConnectionStrings__PostgreSQL=Host=postgres;Port=5432;Database=outbound_db;Username=postgres;Password=postgres
+      - ConnectionStrings__RabbitMQ=amqp://guest:guest@rabbitmq:5672/
+      - OpenTelemetry__OtlpEndpoint=http://otel-collector:4317
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    networks:
+      - hub-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  seq_data:
+
+networks:
+  hub-network:
+    driver: bridge
+

@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: outbound-worker
+  namespace: integration-hub
+  labels:
+    app: outbound-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: outbound-worker
+  template:
+    metadata:
+      labels:
+        app: outbound-worker
+    spec:
+      containers:
+      - name: outbound-worker
+        image: integrationhub/outbound-worker:latest
+        env:
+        - name: ConnectionStrings__PostgreSQL
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: connectionstring
+        - name: ConnectionStrings__RabbitMQ
+          valueFrom:
+            secretKeyRef:
+              name: rabbitmq-secret
+              key: connectionstring
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+

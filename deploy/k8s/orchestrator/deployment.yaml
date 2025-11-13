@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orchestrator-worker
+  namespace: integration-hub
+  labels:
+    app: orchestrator-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: orchestrator-worker
+  template:
+    metadata:
+      labels:
+        app: orchestrator-worker
+    spec:
+      containers:
+      - name: orchestrator-worker
+        image: integrationhub/orchestrator-worker:latest
+        env:
+        - name: ConnectionStrings__PostgreSQL
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: connectionstring
+        - name: ConnectionStrings__RabbitMQ
+          valueFrom:
+            secretKeyRef:
+              name: rabbitmq-secret
+              key: connectionstring
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "pgrep -f Orchestrator.Worker"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+

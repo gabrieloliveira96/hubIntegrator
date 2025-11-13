@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inbound-api
+  namespace: integration-hub
+  labels:
+    app: inbound-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: inbound-api
+  template:
+    metadata:
+      labels:
+        app: inbound-api
+    spec:
+      containers:
+      - name: inbound-api
+        image: integrationhub/inbound-api:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: ConnectionStrings__PostgreSQL
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: connectionstring
+        - name: ConnectionStrings__Redis
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: redis-connection
+        - name: ConnectionStrings__RabbitMQ
+          valueFrom:
+            secretKeyRef:
+              name: rabbitmq-secret
+              key: connectionstring
+        - name: Jwt__Authority
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: jwt-authority
+        - name: Jwt__Audience
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: jwt-audience
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+

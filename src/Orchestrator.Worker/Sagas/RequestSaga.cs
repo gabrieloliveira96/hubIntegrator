@@ -1,0 +1,93 @@
+using MassTransit;
+using MassTransit.EntityFrameworkCoreIntegration;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Orchestrator.Worker.Infrastructure.Persistence;
+using Orchestrator.Worker.Services;
+using Shared.Contracts;
+
+namespace Orchestrator.Worker.Sagas;
+
+public class RequestSaga : MassTransitStateMachine<SagaStateMap>
+{
+    public RequestSaga()
+    {
+        // Define the initial state - CurrentState is a string property
+        InstanceState(x => x.CurrentState);
+
+        // Configure events with proper correlation
+        Event(() => RequestReceivedEvent, x => 
+        {
+            x.CorrelateById(m => m.Message.CorrelationId);
+            x.InsertOnInitial = true; // Allow creating new saga instances
+        });
+        
+        Event(() => RequestCompletedEvent, x => x.CorrelateById(m => m.Message.CorrelationId));
+        Event(() => RequestFailedEvent, x => x.CorrelateById(m => m.Message.CorrelationId));
+
+        Initially(
+            When(RequestReceivedEvent)
+                .Then(context =>
+                {
+                    // Set saga properties
+                    context.Saga.PartnerCode = context.Message.PartnerCode;
+                    context.Saga.RequestType = context.Message.Type;
+                    context.Saga.Payload = context.Message.Payload.ToString();
+                    context.Saga.CreatedAt = context.Message.CreatedAt;
+                    
+                    // CurrentState will be set automatically by MassTransit to Initial
+                    // But ensure it's not empty if somehow it is
+                    if (string.IsNullOrWhiteSpace(context.Saga.CurrentState))
+                    {
+                        context.Saga.CurrentState = Initial.Name;
+                    }
+                })
+                .ThenAsync(async context =>
+                {
+                    // Validate and enrich
+                    var businessRulesService = context.GetServiceOrCreateInstance<IBusinessRulesService>();
+                    await businessRulesService.ValidateRequestAsync(context.Message.PartnerCode, context.Message.Type, context.CancellationToken);
+                    await businessRulesService.EnrichRequestDataAsync(context.Saga.CorrelationId, context.Saga.PartnerCode, context.CancellationToken);
+                })
+                .Publish(context => new DispatchToPartner(
+                    context.Saga.CorrelationId,
+                    context.Saga.PartnerCode,
+                    // Use HTTP in development, HTTPS in production
+                    new Uri($"http://localhost:8080/mock-partner/{context.Saga.PartnerCode}"),
+                    System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(context.Saga.Payload ?? "{}")))
+                .TransitionTo(Processing)
+        );
+
+        During(Processing,
+            When(RequestCompletedEvent)
+                .Then(context =>
+                {
+                    context.Saga.UpdatedAt = DateTimeOffset.UtcNow;
+                })
+                .TransitionTo(Succeeded),
+            When(RequestFailedEvent)
+                .Then(context =>
+                {
+                    context.Saga.UpdatedAt = DateTimeOffset.UtcNow;
+                })
+                .TransitionTo(Failed)
+        );
+
+        // Mark final states as completed
+        SetCompletedWhenFinalized();
+    }
+
+    // States must be initialized as properties
+    // Note: Initial state is provided by MassTransitStateMachine base class
+    public State Received { get; private set; } = null!;
+    public State Validating { get; private set; } = null!;
+    public State Processing { get; private set; } = null!;
+    public State Succeeded { get; private set; } = null!;
+    public State Failed { get; private set; } = null!;
+
+    public Event<RequestReceived> RequestReceivedEvent { get; private set; } = null!;
+    public Event<RequestCompleted> RequestCompletedEvent { get; private set; } = null!;
+    public Event<RequestFailed> RequestFailedEvent { get; private set; } = null!;
+}
+
+

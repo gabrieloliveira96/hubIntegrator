@@ -1,0 +1,6 @@
+{
+  "partnerCode": "PARTNER01",
+  "type": "ORDER",
+  "payload": "{\"orderId\":\"ORD-12345\",\"customerId\":\"CUST-001\",\"items\":[{\"productId\":\"PROD-001\",\"quantity\":2,\"price\":99.99}]}"
+}
+

@@ -1,0 +1,35 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: integration-hub-pdb
+  namespace: integration-hub
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: inbound-api
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: orchestrator-pdb
+  namespace: integration-hub
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: orchestrator-worker
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: outbound-pdb
+  namespace: integration-hub
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: outbound-worker
+

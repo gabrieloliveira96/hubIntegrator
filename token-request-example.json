@@ -1,0 +1,9 @@
+{
+  "clientId": "hub-client",
+  "clientSecret": "hub-secret",
+  "scopes": [
+    "hub.api.write",
+    "hub.api.read"
+  ]
+}
+

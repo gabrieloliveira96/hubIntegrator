@@ -1,0 +1,20 @@
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+WORKDIR /app
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+COPY ["src/Outbound.Worker/Outbound.Worker.csproj", "src/Outbound.Worker/"]
+COPY ["src/Shared/Shared.csproj", "src/Shared/"]
+RUN dotnet restore "src/Outbound.Worker/Outbound.Worker.csproj"
+COPY . .
+WORKDIR "/src/src/Outbound.Worker"
+RUN dotnet build "Outbound.Worker.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "Outbound.Worker.csproj" -c Release -o /app/publish
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "Outbound.Worker.dll"]
+
