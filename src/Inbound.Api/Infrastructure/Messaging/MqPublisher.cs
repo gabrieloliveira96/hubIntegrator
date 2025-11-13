@@ -1,14 +1,10 @@
 using Inbound.Api.Domain;
+using Inbound.Api.Domain.Services;
 using MassTransit;
 using Shared.Contracts;
 using System.Text.Json;
 
 namespace Inbound.Api.Infrastructure.Messaging;
-
-public interface IMqPublisher
-{
-    Task PublishRequestReceivedAsync(Request request, CancellationToken cancellationToken = default);
-}
 
 public class MqPublisher : IMqPublisher
 {

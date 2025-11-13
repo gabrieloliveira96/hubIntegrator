@@ -88,23 +88,43 @@ make seed
 
 ### 3. Executar os serviços
 
+#### Opção A: Com IdentityServer (recomendado para testes completos)
+
 ```bash
-# Terminal 1 - Gateway
+# Terminal 1 - IdentityServer (opcional, mas recomendado para testes)
+cd src/IdentityServer
+dotnet run
+
+# Terminal 2 - Gateway
 cd src/Gateway.Yarp
 dotnet run
 
-# Terminal 2 - Inbound
+# Terminal 3 - Inbound
 cd src/Inbound.Api
 dotnet run
 
-# Terminal 3 - Orchestrator
+# Terminal 4 - Orchestrator
 cd src/Orchestrator.Worker
 dotnet run
 
-# Terminal 4 - Outbound
+# Terminal 5 - Outbound
 cd src/Outbound.Worker
 dotnet run
 ```
+
+#### Opção B: Sem IdentityServer (desenvolvimento rápido)
+
+Edite `appsettings.Development.json` e defina:
+```json
+{
+  "Jwt": {
+    "Authority": "",
+    "AllowDevelopmentWithoutAuthority": true
+  }
+}
+```
+
+Veja [docs/TESTING-WITH-IDENTITYSERVER.md](docs/TESTING-WITH-IDENTITYSERVER.md) para mais detalhes.
 
 ### 4. Testar
 
@@ -164,16 +184,26 @@ curl http://localhost:5000/api/requests/{correlationId} \
 
 ## Segurança
 
-### JWT para Desenvolvimento
+### Autenticação para Testes
 
-Para desenvolvimento local, você pode usar um JWT fake:
+**Recomendado: Use IdentityServer para testes completos**
 
-```bash
-# Gerar token de teste (requer jq)
-TOKEN=$(echo '{"sub":"test-user","aud":"hub-api","scope":"hub.api.write hub.api.read","exp":'$(($(date +%s) + 3600))'}' | base64)
-```
+O IdentityServer está disponível como serviço opcional. Para habilitar:
 
-Ou use um issuer de desenvolvimento configurado em `appsettings.Development.json`.
+1. Execute o IdentityServer: `cd src/IdentityServer && dotnet run`
+2. Obtenha um token:
+   ```bash
+   curl -X POST http://localhost:5002/api/token/obter \
+     -H "Content-Type: application/json" \
+     -d '{"clientId":"hub-client","clientSecret":"hub-secret"}'
+   ```
+3. Use o token nas requisições
+
+**Alternativa: Desenvolvimento sem autenticação**
+
+Configure `appsettings.Development.json` com `AllowDevelopmentWithoutAuthority: true` para testar sem IdentityServer.
+
+Veja [docs/TESTING-WITH-IDENTITYSERVER.md](docs/TESTING-WITH-IDENTITYSERVER.md) para guia completo.
 
 ### Headers Obrigatórios
 
@@ -216,7 +246,7 @@ kubectl apply -f deploy/k8s/
 - [ ] Adicionar mTLS real entre serviços
 - [ ] Implementar ServiceMonitor para Prometheus
 - [ ] Adicionar dashboards Grafana customizados
-- [ ] Implementar autenticação real com IdentityServer/Duende
+- [x] Autenticação OIDC centralizada no Gateway (YARP)
 
 ## Estrutura do Repositório
 

@@ -1,3 +1,5 @@
+using Gateway.Yarp.Infrastructure;
+using Gateway.Yarp.Middleware;
 using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 using Shared.Observability;
@@ -97,12 +99,17 @@ builder.Services.AddRateLimiter(options =>
 });
 
 // Authentication & Authorization
-// Em desenvolvimento, permitir validação flexível se não houver servidor OAuth2
+// O Gateway centraliza autenticação OIDC e rate limiting
+// Em desenvolvimento, permitir validação flexível
 var allowDevWithoutAuth = builder.Configuration.GetValue<bool>("Jwt:AllowDevelopmentWithoutAuthority", defaultValue: true);
-builder.Services.AddJwtAuthentication(
-    authority: builder.Configuration["Jwt:Authority"] ?? "https://localhost:5001",
-    audience: builder.Configuration["Jwt:Audience"] ?? "hub-api",
-    allowDevelopmentWithoutAuthority: allowDevWithoutAuth);
+var jwtAuthority = builder.Configuration["Jwt:Authority"];
+if (!string.IsNullOrEmpty(jwtAuthority))
+{
+    builder.Services.AddJwtAuthentication(
+        authority: jwtAuthority,
+        audience: builder.Configuration["Jwt:Audience"] ?? "hub-api",
+        allowDevelopmentWithoutAuthority: allowDevWithoutAuth);
+}
 
 // OpenTelemetry
 builder.Services.AddOpenTelemetry(
@@ -115,7 +122,7 @@ builder.Services.AddHealthChecks();
 var app = builder.Build();
 
 // Middleware
-app.UseSerilogRequestLogging();
+// IMPORTANTE: UseSerilogRequestLogging deve vir DEPOIS do YARP para não consumir o corpo da resposta
 app.UseCorrelationMiddleware();
 app.UseGlobalErrorHandling();
 
@@ -156,66 +163,31 @@ app.MapGet("/api/info", () => new
 .WithDescription("Informações sobre as rotas do Gateway");
 
 // YARP Reverse Proxy (deve vir ANTES dos endpoints para interceptar)
-app.UseAuthentication();
-app.UseAuthorization();
+// Autenticação JWT é feita manualmente no middleware customizado
 app.UseRateLimiter();
+app.UseJwtAuthentication();
 
 app.MapReverseProxy(proxyPipeline =>
 {
-    proxyPipeline.Use((context, next) =>
-    {
-        // Forward correlation ID
-        var correlationId = context.Items["CorrelationId"]?.ToString();
-        if (!string.IsNullOrEmpty(correlationId))
-        {
-            context.Request.Headers["X-Correlation-Id"] = correlationId;
-        }
-
-        return next();
-    });
+    proxyPipeline.UseCorrelationIdForwarding();
 });
 
-// Pré-carregar metadados JWT em desenvolvimento (síncrono na inicialização)
+// Serilog Request Logging - deve vir DEPOIS do YARP para não interferir com o proxy
+app.UseSerilogRequestLogging();
+
+// Pré-carregar metadados JWT em desenvolvimento
 if (app.Environment.IsDevelopment())
 {
-    try
-    {
-        Log.Information("Pré-carregando metadados JWT do IdentityServer...");
-        var jwtBearerOptions = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>>();
-        var options = jwtBearerOptions.Get(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme);
-        
-        if (options.ConfigurationManager != null)
-        {
-            // Forçar carregamento síncrono dos metadados
-            var configTask = options.ConfigurationManager.GetConfigurationAsync(CancellationToken.None);
-            var config = configTask.GetAwaiter().GetResult(); // Bloquear até carregar
-            
-            Log.Information("Metadados JWT carregados com sucesso. Issuer: {Issuer}, Chaves JWKS: {KeyCount}", 
-                config.Issuer, config.SigningKeys?.Count ?? 0);
-            
-            if (config.SigningKeys == null || config.SigningKeys.Count == 0)
-            {
-                Log.Warning("ATENCAO: Nenhuma chave JWKS foi carregada!");
-            }
-        }
-        else
-        {
-            Log.Warning("ConfigurationManager nao foi configurado!");
-        }
-    }
-    catch (Exception ex)
-    {
-        Log.Error(ex, "ERRO CRITICO ao pré-carregar metadados JWT. A autenticacao pode falhar.");
-    }
+    JwtMetadataPreloader.PreloadJwtMetadata(app.Services, jwtAuthority);
 }
 
 // NOTA: Os endpoints /api/requests são roteados automaticamente pelo YARP.
 // Para ver e testar os endpoints, use o Swagger da Inbound API via Gateway:
-// http://localhost:5187/swagger-inbound
+// http://localhost:5000/swagger-inbound
 
 Log.Information("Gateway.Yarp starting on {Urls}", app.Urls);
-Log.Information("Gateway Swagger: http://localhost:5187/swagger");
-Log.Information("Inbound API Swagger (via Gateway): http://localhost:5187/swagger-inbound");
+Log.Information("Gateway Swagger: http://localhost:5000/swagger");
+Log.Information("Inbound API Swagger (via Gateway): http://localhost:5000/swagger-inbound");
 Log.Information("Inbound API Swagger (direto): http://localhost:5001/swagger");
 
 app.Run();

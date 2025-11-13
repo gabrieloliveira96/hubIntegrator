@@ -1,3 +1,4 @@
+using Inbound.Api.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Shared.Persistence;
 

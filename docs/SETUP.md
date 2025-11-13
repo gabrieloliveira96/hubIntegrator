@@ -65,26 +65,29 @@ cd src/Outbound.Worker
 dotnet run
 ```
 
-## Configuração de JWT para Desenvolvimento
+## Configuração de Autenticação
 
-Para desenvolvimento local, você pode usar um JWT fake ou configurar um issuer de desenvolvimento.
+O Gateway (YARP) centraliza a autenticação OIDC e rate limiting. Para configurar:
 
-### Opção 1: JWT Fake (apenas para testes)
+### Desenvolvimento
 
-Use uma ferramenta como https://jwt.io para gerar um token com:
+Por padrão, o Gateway está configurado para permitir desenvolvimento sem autenticação (`AllowDevelopmentWithoutAuthority: true`).
+
+### Produção
+
+Configure o provedor OIDC no Gateway através da configuração `Jwt:Authority`:
 
 ```json
 {
-  "sub": "test-user",
-  "aud": "hub-api",
-  "scope": "hub.api.write hub.api.read",
-  "exp": 9999999999
+  "Jwt": {
+    "Authority": "https://seu-provedor-oidc.com",
+    "Audience": "hub-api",
+    "AllowDevelopmentWithoutAuthority": false
+  }
 }
 ```
 
-### Opção 2: IdentityServer/Duende (recomendado para produção)
-
-Configure um servidor OIDC real para produção.
+O Gateway validará os tokens JWT e aplicará rate limiting antes de rotear as requisições para os serviços backend.
 
 ## Testes
 

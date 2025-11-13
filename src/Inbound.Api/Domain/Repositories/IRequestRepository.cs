@@ -1,6 +1,4 @@
-using Inbound.Api.Domain;
-
-namespace Inbound.Api.Infrastructure.Persistence.Repositories;
+namespace Inbound.Api.Domain.Repositories;
 
 public interface IRequestRepository
 {
@@ -10,3 +8,4 @@ public interface IRequestRepository
     Task UpdateAsync(Request request, CancellationToken cancellationToken = default);
     Task<bool> ExistsByCorrelationIdAsync(Guid correlationId, CancellationToken cancellationToken = default);
 }
+

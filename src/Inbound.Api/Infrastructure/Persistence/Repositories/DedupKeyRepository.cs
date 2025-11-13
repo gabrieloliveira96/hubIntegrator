@@ -1,4 +1,5 @@
 using Inbound.Api.Domain;
+using Inbound.Api.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 namespace Inbound.Api.Infrastructure.Persistence.Repositories;

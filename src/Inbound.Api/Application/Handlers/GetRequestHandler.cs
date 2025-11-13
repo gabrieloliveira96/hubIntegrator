@@ -1,6 +1,5 @@
 using Inbound.Api.Application.Queries;
-using Inbound.Api.Domain;
-using Inbound.Api.Infrastructure.Persistence.Repositories;
+using Inbound.Api.Domain.Repositories;
 using MediatR;
 
 namespace Inbound.Api.Application.Handlers;

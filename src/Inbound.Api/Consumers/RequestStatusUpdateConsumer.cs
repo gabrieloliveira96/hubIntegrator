@@ -1,4 +1,4 @@
-using Inbound.Api.Infrastructure.Persistence.Repositories;
+using Inbound.Api.Domain.Repositories;
 using MassTransit;
 using Shared.Contracts;
 

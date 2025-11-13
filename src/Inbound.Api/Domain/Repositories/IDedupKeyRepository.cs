@@ -1,6 +1,4 @@
-using Inbound.Api.Domain;
-
-namespace Inbound.Api.Infrastructure.Persistence.Repositories;
+namespace Inbound.Api.Domain.Repositories;
 
 public interface IDedupKeyRepository
 {

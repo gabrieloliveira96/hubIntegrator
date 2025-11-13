@@ -1,9 +1,11 @@
 using Inbound.Api.Application.Behaviors;
 using Inbound.Api.Consumers;
-using Inbound.Api.Endpoints;
+using Inbound.Api.Domain.Repositories;
+using Inbound.Api.Domain.Services;
 using Inbound.Api.Infrastructure.Messaging;
 using Inbound.Api.Infrastructure.Persistence;
 using Inbound.Api.Infrastructure.Persistence.Repositories;
+using Inbound.Api.Presentation.Endpoints;
 using MassTransit;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -44,7 +46,7 @@ builder.Services.AddSwaggerGen(c =>
         Version = "v1",
         Description = "API para recebimento de requisições de parceiros. " +
                      "Require headers obrigatórios: Idempotency-Key, X-Nonce, X-Timestamp. " +
-                     "Require autenticação JWT via IdentityServer."
+                     "Autenticação OIDC e Rate Limiting são gerenciados pelo Gateway."
     });
     
     // Configurar autenticação JWT Bearer
@@ -113,11 +115,11 @@ builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
 });
 
-// Application Services
+// Domain Services (implemented in Infrastructure)
 builder.Services.AddScoped<IIdempotencyStore, IdempotencyStore>();
 builder.Services.AddScoped<IMqPublisher, MqPublisher>();
 
-// Repositories
+// Domain Repositories (implemented in Infrastructure)
 builder.Services.AddScoped<IRequestRepository, RequestRepository>();
 builder.Services.AddScoped<IInboxRepository, InboxRepository>();
 builder.Services.AddScoped<IDedupKeyRepository, DedupKeyRepository>();
@@ -126,12 +128,24 @@ builder.Services.AddScoped<IDedupKeyRepository, DedupKeyRepository>();
 builder.Services.AddScoped(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
 
 // Authentication & Authorization
-// Em desenvolvimento, permitir validação flexível se não houver servidor OAuth2
+// Nota: O Gateway centraliza autenticação OIDC e valida tokens JWT antes de rotear
+// O Inbound.Api confia no Gateway - se a requisição chegou aqui, já foi autenticada
+// Apenas configuramos JWT se houver Authority (para acesso direto sem Gateway em desenvolvimento)
 var allowDevWithoutAuth = builder.Configuration.GetValue<bool>("Jwt:AllowDevelopmentWithoutAuthority", defaultValue: true);
-builder.Services.AddJwtAuthentication(
-    authority: builder.Configuration["Jwt:Authority"] ?? "https://localhost:5002",
-    audience: builder.Configuration["Jwt:Audience"] ?? "hub-api",
-    allowDevelopmentWithoutAuthority: allowDevWithoutAuth);
+var jwtAuthority = builder.Configuration["Jwt:Authority"];
+if (!string.IsNullOrEmpty(jwtAuthority))
+{
+    builder.Services.AddJwtAuthentication(
+        authority: jwtAuthority,
+        audience: builder.Configuration["Jwt:Audience"] ?? "hub-api",
+        allowDevelopmentWithoutAuthority: allowDevWithoutAuth);
+}
+else
+{
+    // Sem Authority configurada = confia totalmente no Gateway
+    // Apenas log para indicar que está confiando no Gateway
+    Log.Information("Inbound.Api configurado para confiar no Gateway para autenticação");
+}
 
 // OpenTelemetry
 builder.Services.AddOpenTelemetry(
@@ -164,26 +178,20 @@ if (app.Environment.IsDevelopment())
         c.EnableValidator();
         c.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.List);
         
-        // Instruções para obter token
-        c.HeadContent = @"
-            <style>
-                .swagger-ui .topbar { display: none; }
-            </style>
-            <div style='background: #f0f0f0; padding: 10px; margin-bottom: 20px; border-radius: 5px;'>
-                <strong>🔑 Como obter um Token JWT:</strong><br/>
-                1. Acesse o IdentityServer: <a href='https://localhost:5002/connect/token' target='_blank'>https://localhost:5002/connect/token</a><br/>
-                2. Use Client Credentials: client_id=hub-client, client_secret=hub-secret<br/>
-                3. Cole o access_token no botão 'Authorize' acima
-            </div>
-        ";
+
     });
 }
 
 // Anti-Replay deve vir depois do Swagger para não bloquear
 app.UseAntiReplay();
 
-app.UseAuthentication();
-app.UseAuthorization();
+// Authentication: Gateway já validou o token JWT antes de rotear
+// Apenas usar UseAuthentication() se JWT estiver configurado (para acesso direto sem Gateway)
+if (!string.IsNullOrEmpty(jwtAuthority))
+{
+    app.UseAuthentication();
+}
+// Authorization removido - Gateway já autorizou (validou token e scopes)
 
 // Endpoints
 app.MapRequestsEndpoints();
@@ -202,16 +210,16 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 }
 
-// Pré-carregar metadados JWT em desenvolvimento (síncrono na inicialização)
-if (app.Environment.IsDevelopment())
+// Pré-carregar metadados JWT em desenvolvimento (apenas se Authority estiver configurado)
+if (app.Environment.IsDevelopment() && !string.IsNullOrEmpty(jwtAuthority))
 {
     try
     {
-        Log.Information("Pré-carregando metadados JWT do IdentityServer...");
+        Log.Information("Pré-carregando metadados JWT do provedor OIDC...");
         var jwtBearerOptions = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>>();
         var options = jwtBearerOptions.Get(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme);
         
-        if (options.ConfigurationManager != null)
+        if (options?.ConfigurationManager != null)
         {
             // Forçar carregamento síncrono dos metadados
             var configTask = options.ConfigurationManager.GetConfigurationAsync(CancellationToken.None);
@@ -227,13 +235,17 @@ if (app.Environment.IsDevelopment())
         }
         else
         {
-            Log.Warning("ConfigurationManager nao foi configurado!");
+            Log.Information("JWT não configurado - Inbound.Api confiando no Gateway para autenticação");
         }
     }
     catch (Exception ex)
     {
-        Log.Error(ex, "ERRO CRITICO ao pré-carregar metadados JWT. A autenticacao pode falhar.");
+        Log.Warning(ex, "Não foi possível pré-carregar metadados JWT. O serviço continuará funcionando.");
     }
+}
+else if (app.Environment.IsDevelopment() && string.IsNullOrEmpty(jwtAuthority))
+{
+    Log.Information("Inbound.Api rodando sem validação JWT local - confiando no Gateway para autenticação");
 }
 
 Log.Information("Inbound.Api starting on {Urls}", app.Urls);

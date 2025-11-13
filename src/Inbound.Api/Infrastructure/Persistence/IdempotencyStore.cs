@@ -1,14 +1,9 @@
 using Inbound.Api.Domain;
-using Inbound.Api.Infrastructure.Persistence.Repositories;
+using Inbound.Api.Domain.Repositories;
+using Inbound.Api.Domain.Services;
 using StackExchange.Redis;
 
 namespace Inbound.Api.Infrastructure.Persistence;
-
-public interface IIdempotencyStore
-{
-    Task<Guid?> GetExistingCorrelationIdAsync(string idempotencyKey, CancellationToken cancellationToken = default);
-    Task<Guid> CreateDedupKeyAsync(string idempotencyKey, Guid correlationId, CancellationToken cancellationToken = default);
-}
 
 public class IdempotencyStore : IIdempotencyStore
 {

@@ -201,8 +201,8 @@ public static class Config
                 AllowedGrantTypes = GrantTypes.Code,
                 RequirePkce = false,
                 RequireClientSecret = false, // Apenas para desenvolvimento
-                RedirectUris = { "https://localhost:5187/swagger/oauth2-redirect.html", "http://localhost:5187/swagger/oauth2-redirect.html" },
-                PostLogoutRedirectUris = { "https://localhost:5187/swagger", "http://localhost:5187/swagger" },
+                RedirectUris = { "https://localhost:5000/swagger/oauth2-redirect.html", "http://localhost:5000/swagger/oauth2-redirect.html" },
+                PostLogoutRedirectUris = { "https://localhost:5000/swagger", "http://localhost:5000/swagger" },
                 AllowedScopes = { "openid", "profile", "hub.api.write", "hub.api.read" },
                 AccessTokenLifetime = 3600,
                 AllowOfflineAccess = true

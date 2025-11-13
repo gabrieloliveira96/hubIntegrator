@@ -1,8 +1,7 @@
 using Inbound.Api.Application.Commands;
 using Inbound.Api.Domain;
-using Inbound.Api.Infrastructure.Messaging;
-using Inbound.Api.Infrastructure.Persistence;
-using Inbound.Api.Infrastructure.Persistence.Repositories;
+using Inbound.Api.Domain.Repositories;
+using Inbound.Api.Domain.Services;
 using MediatR;
 using Shared.Contracts;
 using Shared.Persistence;

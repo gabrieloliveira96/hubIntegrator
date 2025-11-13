@@ -91,7 +91,7 @@ public static class AuthExtensions
                             }
                             catch (Exception ex)
                             {
-                                logger.LogWarning(ex, "Erro ao carregar metadados do IdentityServer");
+                                logger.LogWarning(ex, "Erro ao carregar metadados do provedor OIDC");
                             }
                         },
                         OnAuthenticationFailed = context =>
@@ -113,6 +113,11 @@ public static class AuthExtensions
                                 context.Error, context.ErrorDescription);
                             logger.LogWarning("MetadataAddress: {MetadataAddress}, Authority: {Authority}", 
                                 options.MetadataAddress, options.Authority);
+                            
+                            // IMPORTANTE: Chamar HandleResponse() para indicar que já lidamos com a resposta
+                            // Isso impede que o framework retorne 401 automaticamente
+                            // O middleware customizado do Gateway vai escrever a resposta JSON detalhada
+                            context.HandleResponse();
                             return Task.CompletedTask;
                         },
                         OnTokenValidated = context =>
