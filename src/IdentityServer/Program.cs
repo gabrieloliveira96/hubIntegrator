@@ -117,10 +117,13 @@ app.MapHealthChecks("/readyz");
 // Discovery endpoint (padrão OIDC)
 app.MapGet("/.well-known/openid-configuration", () =>
 {
-    // Em desenvolvimento, usar HTTP; em produção, usar o configurado
-    var baseUrl = app.Environment.IsDevelopment() 
-        ? builder.Configuration["IdentityServer:IssuerUri"] ?? "http://localhost:5002"
-        : builder.Configuration["IdentityServer:IssuerUri"] ?? "https://localhost:5002";
+    // Detectar se está rodando em Docker (usar IssuerUri configurado) ou localmente
+    var isDocker = Environment.GetEnvironmentVariable("ASPNETCORE_URLS")?.Contains("8080") == true;
+    var baseUrl = isDocker
+        ? (builder.Configuration["IdentityServer:IssuerUri"] ?? "http://localhost:5002")  // URL externa para clientes
+        : (app.Environment.IsDevelopment() 
+            ? builder.Configuration["IdentityServer:IssuerUri"] ?? "http://localhost:5002"
+            : builder.Configuration["IdentityServer:IssuerUri"] ?? "https://localhost:5002");
     
     return Results.Ok(new
     {
@@ -138,7 +141,9 @@ app.MapGet("/.well-known/openid-configuration", () =>
 });
 
 Log.Information("IdentityServer starting on {Urls}", app.Urls);
+var isDocker = Environment.GetEnvironmentVariable("ASPNETCORE_URLS")?.Contains("8080") == true;
 var issuerUri = builder.Configuration["IdentityServer:IssuerUri"] ?? "http://localhost:5002";
+Log.Information("Running in Docker: {IsDocker}", isDocker);
 Log.Information("Discovery endpoint: {IssuerUri}/.well-known/openid-configuration", issuerUri);
 Log.Information("Swagger: {IssuerUri}/swagger", issuerUri);
 

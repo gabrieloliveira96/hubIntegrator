@@ -57,7 +57,13 @@ public class TokenController : ControllerBase
 
             // Chamar o endpoint /connect/token do IdentityServer
             var httpClient = _httpClientFactory.CreateClient();
-            var baseUrl = _configuration["IdentityServer:IssuerUri"] ?? "http://localhost:5002";
+            
+            // Detectar se está rodando em Docker (porta interna 8080) ou localmente (porta 5002)
+            var isDocker = Environment.GetEnvironmentVariable("ASPNETCORE_URLS")?.Contains("8080") == true;
+            var baseUrl = isDocker 
+                ? "http://localhost:8080"  // Porta interna do container
+                : (_configuration["IdentityServer:IssuerUri"] ?? "http://localhost:5002");  // Porta externa/local
+            
             var tokenEndpoint = $"{baseUrl}/connect/token";
 
             var formContent = new FormUrlEncodedContent(formData);

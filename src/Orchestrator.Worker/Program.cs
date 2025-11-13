@@ -45,10 +45,24 @@ builder.Services.AddMassTransit(x =>
 
     x.UsingRabbitMq((context, cfg) =>
     {
-        cfg.Host("localhost", "/", h =>
+        var rabbitMqConnectionString = builder.Configuration.GetConnectionString("RabbitMQ") ?? "amqp://guest:guest@localhost:5672/";
+        var uri = new Uri(rabbitMqConnectionString);
+        
+        // Virtual host: usar "/" (padrão) se estiver vazio
+        var virtualHost = uri.AbsolutePath.TrimStart('/');
+        if (string.IsNullOrEmpty(virtualHost))
         {
-            h.Username("guest");
-            h.Password("guest");
+            virtualHost = "/";
+        }
+        
+        cfg.Host(uri.Host, (ushort)uri.Port, virtualHost, h =>
+        {
+            if (!string.IsNullOrEmpty(uri.UserInfo))
+            {
+                var credentials = uri.UserInfo.Split(':');
+                h.Username(credentials[0]);
+                h.Password(credentials.Length > 1 ? credentials[1] : "");
+            }
         });
 
         cfg.ConfigureEndpoints(context);

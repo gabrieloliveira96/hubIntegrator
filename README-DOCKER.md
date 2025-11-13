@@ -35,7 +35,9 @@ Após iniciar, os seguintes serviços estarão disponíveis:
 |---------|-----|-----------|
 | Gateway | http://localhost:5000 | API Gateway (YARP) |
 | Inbound API | http://localhost:5001 | API de recebimento de requisições |
+| IdentityServer | http://localhost:5002 | Servidor OAuth2/OIDC para autenticação |
 | RabbitMQ UI | http://localhost:15672 | Interface de gerenciamento (guest/guest) |
+| Seq | http://localhost:5341 | Logs estruturados |
 | Jaeger | http://localhost:16686 | Visualização de traces |
 | Grafana | http://localhost:3000 | Dashboards (admin/admin) |
 | Prometheus | http://localhost:9090 | Métricas |
@@ -91,16 +93,28 @@ docker-compose -f deploy/docker-compose.yml exec outbound-worker dotnet ef datab
 
 Após iniciar tudo, você pode testar o fluxo completo:
 
-```powershell
-# No Windows PowerShell
-.\test-simple.ps1
-```
-
-Ou manualmente:
+### 1. Obter Token do IdentityServer
 
 ```bash
-curl -X POST http://localhost:5001/requests \
+# Obter token JWT
+curl -X POST http://localhost:5002/api/token/obter \
   -H "Content-Type: application/json" \
+  -d '{
+    "clientId": "hub-client",
+    "clientSecret": "hub-secret",
+    "scopes": ["hub.api.write", "hub.api.read"]
+  }'
+```
+
+### 2. Criar Requisição via Gateway
+
+```bash
+# Usar o token obtido acima
+TOKEN="<seu-token-aqui>"
+
+curl -X POST http://localhost:5000/api/requests \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Idempotency-Key: $(uuidgen)" \
   -H "X-Nonce: $(uuidgen)" \
   -H "X-Timestamp: $(date +%s)" \
@@ -110,6 +124,12 @@ curl -X POST http://localhost:5001/requests \
     "payload": "{\"orderId\":\"12345\",\"customerId\":\"CUST001\"}"
   }'
 ```
+
+### 3. Acessar Swagger
+
+- **IdentityServer**: http://localhost:5002/swagger
+- **Gateway**: http://localhost:5000/swagger
+- **Inbound API**: http://localhost:5001/swagger
 
 ## Troubleshooting
 
@@ -151,6 +171,8 @@ hub-prometheus            → Prometheus (porta 9090)
 hub-grafana               → Grafana (porta 3000)
 hub-loki                  → Loki (porta 3100)
 hub-promtail              → Promtail
+hub-seq                   → Seq (porta 5341)
+hub-identityserver        → IdentityServer (porta 5002)
 hub-gateway               → Gateway.Yarp (porta 5000)
 hub-inbound-api           → Inbound.Api (porta 5001)
 hub-orchestrator-worker   → Orchestrator.Worker

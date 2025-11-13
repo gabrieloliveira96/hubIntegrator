@@ -126,21 +126,18 @@ var app = builder.Build();
 app.UseCorrelationMiddleware();
 app.UseGlobalErrorHandling();
 
-// Swagger
-if (app.Environment.IsDevelopment())
+// Swagger - sempre habilitado para facilitar desenvolvimento e testes
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        // Swagger do Gateway (info sobre rotas)
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Gateway API v1");
-        
-        // Swagger da Inbound API (proxy)
-        c.SwaggerEndpoint("/swagger-inbound/v1/swagger.json", "Inbound API v1 (via Gateway)");
-        
-        c.RoutePrefix = "swagger";
-    });
-}
+    // Swagger do Gateway (info sobre rotas)
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Gateway API v1");
+    
+    // Swagger da Inbound API (proxy)
+    c.SwaggerEndpoint("/swagger-inbound/v1/swagger.json", "Inbound API v1 (via Gateway)");
+    
+    c.RoutePrefix = "swagger";
+});
 
 // Health (antes do YARP para não ser interceptado)
 app.MapHealthChecks("/healthz");
