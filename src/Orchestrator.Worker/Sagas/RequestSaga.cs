@@ -2,6 +2,7 @@ using MassTransit;
 using MassTransit.EntityFrameworkCoreIntegration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orchestrator.Worker.Infrastructure.Persistence;
 using Orchestrator.Worker.Services;
 using Shared.Contracts;
@@ -71,6 +72,59 @@ public class RequestSaga : MassTransitStateMachine<SagaStateMap>
                     context.Saga.UpdatedAt = DateTimeOffset.UtcNow;
                 })
                 .TransitionTo(Failed)
+        );
+
+        // Handle duplicate events in final states (idempotency)
+        // If we receive RequestCompleted when already Succeeded, ignore it
+        During(Succeeded,
+            When(RequestCompletedEvent)
+                .Then(context =>
+                {
+                    // Event already processed, just log and ignore
+                    // This ensures idempotency for duplicate messages
+                    var logger = context.GetPayload<ILogger<RequestSaga>>();
+                    logger?.LogWarning(
+                        "Received duplicate RequestCompleted event for saga {CorrelationId} in state {State}. Ignoring.",
+                        context.Message.CorrelationId,
+                        context.Saga.CurrentState);
+                }),
+            // If we receive RequestFailed when already Succeeded, log but don't change state
+            // (saga already succeeded, can't fail now)
+            When(RequestFailedEvent)
+                .Then(context =>
+                {
+                    var logger = context.GetPayload<ILogger<RequestSaga>>();
+                    logger?.LogWarning(
+                        "Received RequestFailed event for saga {CorrelationId} in state {State}. Saga already succeeded, ignoring.",
+                        context.Message.CorrelationId,
+                        context.Saga.CurrentState);
+                })
+        );
+
+        // If we receive RequestFailed when already Failed, ignore it
+        During(Failed,
+            When(RequestFailedEvent)
+                .Then(context =>
+                {
+                    // Event already processed, just log and ignore
+                    // This ensures idempotency for duplicate messages
+                    var logger = context.GetPayload<ILogger<RequestSaga>>();
+                    logger?.LogWarning(
+                        "Received duplicate RequestFailed event for saga {CorrelationId} in state {State}. Ignoring.",
+                        context.Message.CorrelationId,
+                        context.Saga.CurrentState);
+                }),
+            // If we receive RequestCompleted when already Failed, log but don't change state
+            // (saga already failed, can't succeed now)
+            When(RequestCompletedEvent)
+                .Then(context =>
+                {
+                    var logger = context.GetPayload<ILogger<RequestSaga>>();
+                    logger?.LogWarning(
+                        "Received RequestCompleted event for saga {CorrelationId} in state {State}. Saga already failed, ignoring.",
+                        context.Message.CorrelationId,
+                        context.Saga.CurrentState);
+                })
         );
 
         // Mark final states as completed
