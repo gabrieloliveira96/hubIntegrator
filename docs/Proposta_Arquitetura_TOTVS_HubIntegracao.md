@@ -212,6 +212,9 @@ sequenceDiagram
     R->>O: Consume RequestCompleted/Failed
     O->>DB: Update Saga State
     O->>O: Finalize Saga
+    
+    R->>I: Consume RequestCompleted/Failed
+    I->>DB: Update Request Status
 ```
 
 ### 2.3 Bounded Contexts
