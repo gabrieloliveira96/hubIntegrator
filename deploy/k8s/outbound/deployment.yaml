@@ -22,13 +22,23 @@ spec:
         - name: ConnectionStrings__PostgreSQL
           valueFrom:
             secretKeyRef:
-              name: postgres-secret
+              name: postgres-secret-outbound
               key: connectionstring
         - name: ConnectionStrings__RabbitMQ
           valueFrom:
             secretKeyRef:
               name: rabbitmq-secret
               key: connectionstring
+        - name: OpenTelemetry__OtlpEndpoint
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: otel-endpoint
+        - name: Seq__ServerUrl
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: seq-url
         resources:
           requests:
             memory: "256Mi"

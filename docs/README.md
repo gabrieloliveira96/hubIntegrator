@@ -24,14 +24,7 @@ docs/
 ├── Guias de Uso
 │   ├── TESTING-WITH-IDENTITYSERVER.md  # Como testar com IdentityServer
 │   └── AUTHENTICATION-FLOW.md          # Fluxo de autenticação
-│
-├── Geração de Documentação
-│   ├── GERAR-PDF.md                # Como gerar PDF da documentação
-│   ├── generate-pdf.ps1            # Script PowerShell
-│   └── generate-pdf-python.py       # Script Python alternativo
-│
-└── Contratos
-    └── api-contracts.openapi.yaml  # Contratos OpenAPI da API
+
 ```
 
 ## 🎯 Documentos Principais
@@ -73,14 +66,10 @@ Documentação técnica completa com:
 
 - **[AUTHENTICATION-FLOW.md](./AUTHENTICATION-FLOW.md)** - Como funciona a autenticação (exemplos práticos e troubleshooting)
 
-### 📄 Geração de Documentação
-
-- **[GERAR-PDF.md](./GERAR-PDF.md)** - Como gerar PDF da documentação técnica
 
 ## 🔗 Links Úteis
 
 - [README Principal](../README.md) - Visão geral do projeto
-- [Contratos OpenAPI](./api-contracts.openapi.yaml) - Especificação da API
 
 ## 📝 Convenções
 
@@ -90,5 +79,5 @@ Documentação técnica completa com:
 
 ---
 
-**Última atualização**: Janeiro 2025
+**Última atualização**: Novembro 2025
 

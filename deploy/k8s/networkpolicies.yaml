@@ -23,9 +23,7 @@ spec:
       port: 8080
   egress:
   - to:
-    - podSelector:
-        matchLabels:
-      namespaceSelector:
+    - namespaceSelector:
         matchLabels:
           name: integration-hub
     ports:

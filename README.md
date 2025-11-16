@@ -17,11 +17,6 @@ A documentação inclui:
 - Deploy e escalabilidade
 - Matriz de requisitos não funcionais
 
-**Para gerar o PDF:**
-```powershell
-.\docs\generate-pdf.ps1
-```
-Ou consulte [docs/GERAR-PDF.md](./docs/GERAR-PDF.md) para outras opções.
 
 ## Arquitetura
 
@@ -100,6 +95,12 @@ Isso sobe:
 - Prometheus (porta 9090)
 - Grafana (porta 3000)
 - Loki + Promtail
+- Seq (porta 5341)
+- IdentityServer (porta 5002)
+- Gateway (porta 5000)
+- Inbound API (porta 5001)
+- Orchestrator Worker
+- Outbound Worker
 
 ### 2. Aplicar migrations
 
@@ -163,7 +164,7 @@ curl -X POST http://localhost:5000/api/requests \
   -d '{
     "partnerCode": "PARTNER01",
     "type": "ORDER",
-    "payload": {"orderId": "12345"}
+    "payload": "{\"orderId\":\"12345\"}"
   }'
 
 # Consultar status
@@ -176,13 +177,21 @@ curl http://localhost:5000/api/requests/{correlationId} \
 ### Gateway (porta 5000)
 - `GET /healthz` - Health check
 - `GET /readyz` - Readiness check
+- `GET /swagger` - Swagger UI do Gateway
+- `GET /swagger-inbound` - Swagger UI da Inbound API (via proxy)
+- `GET /api/info` - Informações sobre rotas do Gateway
 - `POST /api/requests` - Criar requisição (proxied para Inbound)
+- `GET /api/requests/{id}` - Consultar status (proxied para Inbound)
 
 ### Inbound.Api (porta 5001)
 - `GET /healthz` - Health check
 - `GET /readyz` - Readiness check
+- `GET /swagger` - Swagger UI
 - `POST /requests` - Criar requisição
 - `GET /requests/{id}` - Consultar status
+
+### IdentityServer (porta 5002)
+- `POST /api/token/obter` - Obter token JWT
 
 ## Observabilidade
 
@@ -203,13 +212,18 @@ curl http://localhost:5000/api/requests/{correlationId} \
 - URL: http://localhost:15672
 - Credenciais: guest/guest
 
+### Seq
+- URL: http://localhost:5341
+- Logging estruturado e busca de logs
+
 ## Segurança
 
 ### Autenticação para Testes
 
 **Recomendado: Use IdentityServer para testes completos**
 
-O IdentityServer está disponível como serviço opcional. Para habilitar:
+O IdentityServer está disponível automaticamente quando você usa `docker-compose up` (porta 5002). 
+Se estiver rodando manualmente:
 
 1. Execute o IdentityServer: `cd src/IdentityServer && dotnet run`
 2. Obtenha um token:
@@ -245,12 +259,28 @@ Os testes de integração usam Testcontainers para criar instâncias isoladas de
 
 ## Kubernetes
 
-Manifests estão em `deploy/k8s/`:
+Manifests Kubernetes completos estão em `deploy/k8s/`. 
+
+**📖 Para instruções detalhadas de deploy, consulte [deploy/README.md](deploy/README.md)**
+
+Deploy rápido:
 
 ```bash
+# Aplicar namespace
 kubectl apply -f deploy/k8s/namespace.yaml
+
+# Aplicar ConfigMaps e Secrets
+kubectl apply -f deploy/k8s/configmap.yaml
+kubectl apply -f deploy/k8s/secrets.yaml
+
+# Aplicar todos os deployments
 kubectl apply -f deploy/k8s/
 ```
+
+**⚠️ Importante:** Antes de fazer deploy, certifique-se de que:
+- As imagens Docker estão disponíveis no registry (ou use `kind load` para desenvolvimento local)
+- Os Secrets foram configurados com valores apropriados para produção
+- As connection strings apontam para os serviços corretos
 
 ## Limites & Próximos Passos
 
@@ -275,13 +305,19 @@ kubectl apply -f deploy/k8s/
 /
 ├── docs/              # Documentação e ADRs
 ├── deploy/            # Docker Compose e K8s manifests
+│   ├── docker-compose.yml
+│   ├── k8s/           # Kubernetes manifests
+│   └── README.md       # Guia de deploy
 ├── src/               # Código fonte
-│   ├── Gateway.Yarp/
-│   ├── Inbound.Api/
-│   ├── Orchestrator.Worker/
-│   ├── Outbound.Worker/
-│   ├── Shared/
-│   └── Tests/
+│   ├── Gateway.Yarp/  # API Gateway (YARP)
+│   ├── IdentityServer/ # IdentityServer para autenticação
+│   ├── Inbound.Api/   # API de recepção de requisições
+│   ├── Orchestrator.Worker/ # Worker de orquestração (Saga)
+│   ├── Outbound.Worker/     # Worker de integração externa
+│   ├── Shared/        # Código compartilhado
+│   └── Tests/         # Testes unitários e de integração
+├── Dockerfile.*       # Dockerfiles para cada serviço
+├── Makefile           # Comandos úteis
 └── README.md
 ```
 

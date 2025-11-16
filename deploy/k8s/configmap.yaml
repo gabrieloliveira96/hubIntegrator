@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: integration-hub
+data:
+  redis-connection: "redis-service:6379"
+  jwt-authority: "http://identityserver-service:80"
+  jwt-audience: "hub-api"
+  otel-endpoint: "http://otel-collector-service:4317"
+  seq-url: "http://seq-service:80"
+

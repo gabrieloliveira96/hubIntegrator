@@ -1,41 +1,30 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: inbound-api
+  name: gateway-yarp
   namespace: integration-hub
   labels:
-    app: inbound-api
+    app: gateway-yarp
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: inbound-api
+      app: gateway-yarp
   template:
     metadata:
       labels:
-        app: inbound-api
+        app: gateway-yarp
     spec:
       containers:
-      - name: inbound-api
-        image: integrationhub/inbound-api:latest
+      - name: gateway-yarp
+        image: integrationhub/gateway-yarp:latest
         ports:
         - containerPort: 8080
         env:
-        - name: ConnectionStrings__PostgreSQL
-          valueFrom:
-            secretKeyRef:
-              name: postgres-secret
-              key: connectionstring
-        - name: ConnectionStrings__Redis
-          valueFrom:
-            configMapKeyRef:
-              name: app-config
-              key: redis-connection
-        - name: ConnectionStrings__RabbitMQ
-          valueFrom:
-            secretKeyRef:
-              name: rabbitmq-secret
-              key: connectionstring
+        - name: ASPNETCORE_URLS
+          value: "http://+:8080"
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
         - name: Jwt__Authority
           valueFrom:
             configMapKeyRef:
@@ -46,6 +35,10 @@ spec:
             configMapKeyRef:
               name: app-config
               key: jwt-audience
+        - name: Jwt__AllowDevelopmentWithoutAuthority
+          value: "false"
+        - name: ReverseProxy__Clusters__inbound-cluster__Destinations__destination1__Address
+          value: "http://inbound-api:80"
         - name: OpenTelemetry__OtlpEndpoint
           valueFrom:
             configMapKeyRef:

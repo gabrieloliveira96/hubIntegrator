@@ -1,7 +1,7 @@
 # Proposta de Arquitetura – Hub de Integração e Orquestração TOTVS (.NET 8)
 
-**Autor:** Tech Lead .NET  
-**Data:** Janeiro 2025  
+**Autor:** Gabriel Silva
+**Data:** Novembro 2025  
 **Versão:** 1.0
 
 ---
@@ -1502,6 +1502,6 @@ Os diagramas Mermaid podem ser renderizados usando:
 
 ---
 
-*Versão 1.0 – Janeiro 2025*  
+*Versão 1.0 – Novembro 2025*  
 *© 2025 TOTVS – Tech Lead .NET*
 

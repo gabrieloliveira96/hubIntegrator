@@ -1,34 +1,32 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: orchestrator-worker
+  name: identityserver
   namespace: integration-hub
   labels:
-    app: orchestrator-worker
+    app: identityserver
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: orchestrator-worker
+      app: identityserver
   template:
     metadata:
       labels:
-        app: orchestrator-worker
+        app: identityserver
     spec:
       containers:
-      - name: orchestrator-worker
-        image: integrationhub/orchestrator-worker:latest
+      - name: identityserver
+        image: integrationhub/identityserver:latest
+        ports:
+        - containerPort: 8080
         env:
-        - name: ConnectionStrings__PostgreSQL
-          valueFrom:
-            secretKeyRef:
-              name: postgres-secret-orchestrator
-              key: connectionstring
-        - name: ConnectionStrings__RabbitMQ
-          valueFrom:
-            secretKeyRef:
-              name: rabbitmq-secret
-              key: connectionstring
+        - name: ASPNETCORE_URLS
+          value: "http://+:8080"
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        - name: IdentityServer__IssuerUri
+          value: "http://identityserver-service:80"
         - name: OpenTelemetry__OtlpEndpoint
           valueFrom:
             configMapKeyRef:
@@ -40,13 +38,17 @@ spec:
               name: app-config
               key: seq-url
         livenessProbe:
-          exec:
-            command:
-            - /bin/sh
-            - -c
-            - "pgrep -f Orchestrator.Worker"
+          httpGet:
+            path: /healthz
+            port: 8080
           initialDelaySeconds: 30
           periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
         resources:
           requests:
             memory: "256Mi"

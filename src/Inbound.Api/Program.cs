@@ -267,3 +267,6 @@ Log.Information("Environment: {Environment}", app.Environment.EnvironmentName);
 Log.Information("Swagger available at: http://localhost:5001/swagger");
 
 app.Run();
+
+// Make Program class accessible for WebApplicationFactory
+public partial class Program { }
