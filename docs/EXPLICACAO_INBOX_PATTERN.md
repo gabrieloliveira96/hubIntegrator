@@ -361,3 +361,5 @@ O **Inbox Pattern** é essencial para garantir **idempotência no consumo de men
 Ambos trabalham juntos para criar um sistema resiliente! 🎯
 
 
+
+

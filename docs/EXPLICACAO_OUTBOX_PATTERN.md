@@ -195,3 +195,5 @@ Se quiser padronizar, você poderia:
 A escolha atual faz sentido arquiteturalmente! 🎯
 
 
+
+

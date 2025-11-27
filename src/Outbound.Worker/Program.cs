@@ -43,9 +43,9 @@ if (isDevelopment)
 
 builder.Services.AddHttpClient("ThirdParty", client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(30);
     client.DefaultRequestHeaders.Add("User-Agent", "IntegrationHub/1.0");
 })
+.AddPolicyHandler(ResiliencePolicies.GetCombinedPolicy())
 .ConfigurePrimaryHttpMessageHandler(() => httpClientHandler);
 
 builder.Services.AddScoped<IThirdPartyClient, ThirdPartyClient>();
